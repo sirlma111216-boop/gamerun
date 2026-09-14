@@ -27,13 +27,15 @@ GitHub 주소는 개발·배포용이고, Render 주소는 학생에게 나눠�
 | 요금제 | Free — 첫 공개 접속 시험용 |
 | 지역 | Singapore |
 | 서버 수 | 1 |
-| Build Command | `npm ci && npm run build` |
+| Build Command | `npm ci --include=dev && npm run build` |
 | Start Command | `npm start` |
 | Health Check Path | `/health` |
 | 자동 배포 | Off — 수업 종료 후 수동 배포 |
 | 환경변수 | `NODE_ENV=production`, `NODE_VERSION=24.16.0`, `ENABLE_TEST_ROOMS=false` |
 
 `PORT`는 Render가 제공하므로 고정하지 않습니다. 저장소 루트에 `package.json`이 있으면 Root Directory는 비웁니다. 하위 폴더에 게임을 올렸다면 그 폴더를 지정합니다.
+
+빌드에는 TypeScript·Vite·Node 타입 정의가 필요합니다. `NODE_ENV=production`에서도 설치되도록 `--include=dev`를 지정합니다. 프로젝트의 `.npmrc`에도 `include=dev`를 넣어 기존 Build Command가 `npm ci && npm run build`인 서비스도 새 커밋을 배포하면 필요한 도구를 설치하도록 했습니다. `.npmrc`는 배포 소스에 포함하세요. `Cannot find type definition file for 'node'` 오류가 난 이전 배포는 수정된 최신 커밋으로 다시 배포합니다.
 
 현재 Blueprint 명세에서는 요금제를 생략하면 새 Web Service에 유료 기본값이 적용될 수 있어 Free를 명시했습니다. 자동 배포는 수업 중 코드 수정으로 서버가 재시작되는 일을 피하도록 껐습니다. 파일 수정은 이미 배포된 서비스에 자동 적용되는 것이 아니며 Blueprint 동기화나 대시보드 적용이 필요합니다.
 
