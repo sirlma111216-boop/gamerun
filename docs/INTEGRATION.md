@@ -136,7 +136,7 @@ frame.contentWindow.postMessage({type:'lumi:mount',config:{
 |---|---|
 | `LESSON_SHARED_SECRET` | 강의 앱 Cloudflare 의 `LUMI_SHARED_SECRET` 과 **같은 값**. 없으면 연동 방을 열지 않는다 |
 | `LESSON_RESULT_URL` | `https://scienced.labbitory.com/api/lumi/result` |
-| `ALLOWED_ORIGINS` | 게임 주소와 강의 앱 주소 — `https://<게임>.onrender.com,https://scienced.labbitory.com` |
+| `ALLOWED_ORIGINS` | **두지 않는다.** iframe 이 게임 origin 에 있으므로 WebSocket 의 Origin 은 게임 자신이고 기본 같은-host 검사로 충분하다. 굳이 두려면 게임 주소를 반드시 포함 — 강의 앱 주소만 넣으면 모든 접속이 403 이다 |
 
 검사: `npm test`(티켓·방 규칙), `LESSON_SHARED_SECRET=… npx tsx scripts/lesson-check.ts`(서버를 띄워 두고 티켓 생성·참가·거절·webhook 수신까지 17항목).
 
