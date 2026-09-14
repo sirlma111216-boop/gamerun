@@ -3,12 +3,21 @@ import {createMap} from '../shared/maps.js';
 import {chaseAt,makePlayer,stepPlayer} from '../shared/physics.js';
 import {finalize} from '../shared/results.js';
 import {DEFAULT_RULES,NO_INPUT,validateRules,type Input,type Player,type Rules,type Snapshot,type GameResult} from '../shared/types.js';
+/** 강의 앱 연동 방 — 티켓으로만 만들고 들어간다. 단독 방은 null. */
+export type LessonIntegration={cid:string;lid:string;teacherUid:string;iss:string};
 export class Room {
  testOnly=false;
+ integration:LessonIntegration|null=null;
+ /** 결과를 강의 앱에 보낸 경기 id — 같은 결과를 두 번 보내지 않는다 */
+ deliveredMatch='';
  code:string;hostToken=randomUUID();hostConnected=true;hostLastSeen=Date.now();activityId:string;mapId:number;rules:Rules;map;phase:Snapshot['phase']='lobby';tick=0;countdown=0;matchId=randomUUID();result:GameResult|null=null;players=new Map<string,Player>();tokens=new Map<string,string>();inputs=new Map<string,{value:Input;at:number}>();created=Date.now();updated=Date.now();firstFinish:number|null=null;
  constructor(code:string,activityId='',mapId=1,rules:unknown=DEFAULT_RULES){this.code=code;this.activityId=activityId;this.mapId=mapId;this.rules=validateRules(rules);this.map=createMap(mapId,this.rules.duration);}
- join(name:string,id:string,token?:string){
-  if(this.players.has(id)){if(!token||this.tokens.get(id)!==token)throw Error('같은 참가자 ID가 이미 사용 중입니다. 다른 ID로 참가해 주세요.');const p=this.players.get(id)!;p.connected=true;return {player:p,token};}
+ /**
+  * @param trusted 강의 앱 티켓으로 신원이 검증된 참가 — 같은 ID 의 재접속을 토큰 없이 허용한다.
+  *                (새로고침·다른 탭. 남의 ID 를 사칭할 수 없는 것은 티켓이 보증한다)
+  */
+ join(name:string,id:string,token?:string,trusted=false){
+  if(this.players.has(id)){const p=this.players.get(id)!;if(!trusted&&(!token||this.tokens.get(id)!==token))throw Error('같은 참가자 ID가 이미 사용 중입니다. 다른 ID로 참가해 주세요.');p.connected=true;p.name=name||p.name;return {player:p,token:this.tokens.get(id)!};}
   if(this.players.size>=30)throw Error('방이 가득 찼습니다 (최대 30명).');
   const p=makePlayer(id,name,this.rules.lives);if(this.phase!=='lobby')p.status='spectator';this.players.set(id,p);const secret=randomUUID();this.tokens.set(id,secret);return {player:p,token:secret};
  }

@@ -16,3 +16,10 @@ services:
         value: 24.16.0
       - key: ENABLE_TEST_ROOMS
         value: "false"
+      # 강의 앱 연동 — 값은 Render 대시보드에서 넣는다 (docs/INTEGRATION.md · 강의 앱 연동)
+      - key: LESSON_SHARED_SECRET
+        sync: false
+      - key: LESSON_RESULT_URL
+        value: https://scienced.labbitory.com/api/lumi/result
+      - key: ALLOWED_ORIGINS
+        sync: false

@@ -1,4 +1,4 @@
-export const VERSION = '2.0.0';
+export const VERSION = '2.1.0';
 export type Mode = 'race' | 'last';
 /** duration selects course length only; lives=0 means unlimited. */
 export type Rules = {mode:Mode;duration:30|45|60|90;lives:0|1|3|5;count:number;text:string};

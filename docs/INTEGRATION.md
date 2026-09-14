@@ -91,8 +91,54 @@ frame.contentWindow.postMessage({type:'lumi:mount',config:{
 }}, 'https://your-game.example');
 ```
 
-수신 이벤트: `lumi:available`, `lumi:ready`, `lumi:start`, `lumi:end`, `lumi:result`.
-송신 명령: `lumi:mount`, `lumi:start`, `lumi:stop`, `lumi:restart`, `lumi:destroy`.
+수신 이벤트: `lumi:available`, `lumi:ready`, `lumi:lobby`(로비 참가자·접속 변동), `lumi:start`, `lumi:end`, `lumi:result`.
+송신 명령: `lumi:mount`, `lumi:create`, `lumi:join`, `lumi:start`, `lumi:stop`, `lumi:restart`, `lumi:destroy`.
+
+## 강의 앱 연동 (2.1 · 발표자 선정)
+
+강의 앱(Science Lesson Studio, `scienced`)의 3·4강 발표자 선정이 이 게임을 쓴다. 학생은 코드·닉네임을 입력하지 않고 자기 계정으로 저절로 들어오고, 결과는 서버가 서명해 강의 앱 서버 함수로 보낸다. 브라우저의 `lumi:result` 는 화면용일 뿐이고 발표자는 그 webhook 으로만 확정된다.
+
+### 티켓
+
+강의 앱 서버 함수(`/api/lumi/ticket`)가 로그인·역할·수강 등록을 확인하고 발급한다. 형식은 `base64url(JSON) + '.' + base64url(HMAC-SHA256(secret, base64url(JSON)))`.
+
+| 필드 | 뜻 |
+|---|---|
+| iss / aud | `scienced` / `lumi-run` |
+| cid / lid / act | 클래스 · 차시 · 활동 실행 id (같은 차시를 두 번 해도 다른 값) |
+| sub / name / role | 계정 uid · 표시 이름(18자) · `teacher` | `student` |
+| iat / exp | 발급·만료(초). 한 수업 시간(120분) |
+
+게임 서버는 티켓의 서명·만료·활동만 믿고 브라우저가 보낸 id·이름은 무시한다.
+`create` 는 교사 티켓만, 같은 `act` 로 다시 만들면 새 방이 아니라 그 방에 교사로 다시 잇는다(`reused`).
+`join` 은 학생 티켓이 방의 `act` 와 같아야 한다. 티켓이 없거나 다른 활동이면 거절. 연동 방은 시작·종료·재경기를 교사만 한다(`LESSON_START_POLICY='teacher'`).
+
+### mount config (연동에 추가된 것)
+
+```js
+{ entryRole:'teacher'|'student', integrationTicket, activityId, roomCode, autoJoin:true,
+  participant:{id,name}, storageKey, rules:{mode,count,text}, serverUrl, joinBaseUrl }
+```
+
+- 교사: `lumi:mount` 뒤 `lumi:create` 로 방을 만든다. 로비에 들어가면 `lumi:ready`(방 코드) — 강의 앱이 세션에 적는다. `roomCode` 를 주고 다시 mount 하면 그 방에 다시 잇는다(새로고침).
+- 학생: `roomCode` + `autoJoin` 이면 한 번만 저절로 참가한다. 시작 단추와 참가 코드 입력은 보이지 않는다.
+- `lumi:lobby` 는 로비에서 참가자나 접속 상태가 바뀔 때마다 온다 — 강의 콘솔의 「게임 연결 N명」이 이것으로 산다.
+
+### 결과 전달 (webhook)
+
+경기가 끝나면 `LESSON_RESULT_URL` 로 POST 한다. 본문은 `{type:'lumi.result', sentAt, room:{code, activityId, cid, lid}, result}`,
+헤더 `x-lumi-signature: sha256=<hex HMAC-SHA256(LESSON_SHARED_SECRET, 본문 그대로)>`.
+실패하면 5·20·60초 뒤 다시 보내고, 같은 경기는 한 번만 보낸다. 강의 앱은 `(activityId, matchId)` 로 멱등 저장한다. `/health` 의 `lesson.pendingResults` 가 재시도 대기 수다.
+
+### 환경 변수 (Render)
+
+| 변수 | 값 |
+|---|---|
+| `LESSON_SHARED_SECRET` | 강의 앱 Cloudflare 의 `LUMI_SHARED_SECRET` 과 **같은 값**. 없으면 연동 방을 열지 않는다 |
+| `LESSON_RESULT_URL` | `https://scienced.labbitory.com/api/lumi/result` |
+| `ALLOWED_ORIGINS` | 게임 주소와 강의 앱 주소 — `https://<게임>.onrender.com,https://scienced.labbitory.com` |
+
+검사: `npm test`(티켓·방 규칙), `LESSON_SHARED_SECRET=… npx tsx scripts/lesson-check.ts`(서버를 띄워 두고 티켓 생성·참가·거절·webhook 수신까지 17항목).
 
 ## 1.x에서 2.0으로 변경
 
