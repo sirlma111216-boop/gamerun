@@ -38,10 +38,12 @@ const game = mountLumiRun(document.querySelector('#activity'), {
 | 값 | 지원 범위 |
 |---|---|
 | map | 1 초원, 2 공중정원, 3 사막, 4 수정동굴, 5 별빛공장 |
-| mode | race: 도착 보상, last: 꼴찌 선정 |
+| mode | race: 도착 보상, last: 꼴찌 선정, ranks: 등수 발표(`ranks` 필요 · 결과 때까지 비밀) |
 | duration | 30 / 45 / 60 / 90. **코스 길이**, 제한 시간이 아님 |
 | lives | 0(무한), 1, 3, 5 |
-| count | 선정 인원 1~30, 시작 시 연결 참가 인원 이하 |
+| count | 선정 인원 1~30, 시작 시 연결 참가 인원 이하 (ranks 방식은 ranks 개수로 맞춰지고 인원 검사 없음) |
+| ranks | ranks 방식의 발표 등수 — 1~30 사이 서로 다른 수 1~5개 (예: [6,9]) |
+| timeLimit | 출발 뒤 제한 시간(초). 0(없음) 또는 10~600. 강의 앱 연동은 60 |
 | text | 외부 앱 결과 제목, 80자 이내. 게임의 세부 설정 화면에는 노출하지 않음 |
 
 도착 보상은 상위 N명, 꼴찌는 N명 탈락 또는 첫 완주 발생 시점의 뒤쪽 순서, 동점은 공동 선정으로 고정합니다. 자세한 예외는 `RULES.md`에 있습니다. 임의 규칙 코드는 받지 않습니다.
@@ -91,7 +93,7 @@ frame.contentWindow.postMessage({type:'lumi:mount',config:{
 }}, 'https://your-game.example');
 ```
 
-수신 이벤트: `lumi:available`, `lumi:ready`, `lumi:lobby`(로비 참가자·접속 변동), `lumi:start`, `lumi:end`, `lumi:result`.
+수신 이벤트: `lumi:available`, `lumi:ready`, `lumi:lobby`(로비 참가자·접속 변동), `lumi:start`, `lumi:end`, `lumi:result`, `lumi:error`(서버가 거절한 이유 — 티켓·방 없음 등).
 송신 명령: `lumi:mount`, `lumi:create`, `lumi:join`, `lumi:start`, `lumi:stop`, `lumi:restart`, `lumi:destroy`.
 
 ## 강의 앱 연동 (2.1 · 발표자 선정)
@@ -120,6 +122,8 @@ frame.contentWindow.postMessage({type:'lumi:mount',config:{
   participant:{id,name}, storageKey, rules:{mode,count,text}, serverUrl, joinBaseUrl }
 ```
 
+- 연동 방의 로비는 QR·참가 링크·설정 패널을 숨긴다. 교사는 참가자 명단을 보고 「다 함께 시작」만 누른다.
+- 학생 config 의 `rules` 에는 `ranks` 를 넣지 않는다(학생 브라우저에 등수가 가지 않게). 서버 스냅숏도 결과 전에는 `ranks` 를 뺀다.
 - 교사: `lumi:mount` 뒤 `lumi:create` 로 방을 만든다. 로비에 들어가면 `lumi:ready`(방 코드) — 강의 앱이 세션에 적는다. `roomCode` 를 주고 다시 mount 하면 그 방에 다시 잇는다(새로고침).
 - 학생: `roomCode` + `autoJoin` 이면 한 번만 저절로 참가한다. 시작 단추와 참가 코드 입력은 보이지 않는다.
 - `lumi:lobby` 는 로비에서 참가자나 접속 상태가 바뀔 때마다 온다 — 강의 콘솔의 「게임 연결 N명」이 이것으로 산다.

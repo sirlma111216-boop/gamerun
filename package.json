@@ -1,5 +1,5 @@
 {
-  "name": "lumi-run", "version": "2.1.0", "private": true, "type": "module",
+  "name": "lumi-run", "version": "2.2.0", "private": true, "type": "module",
   "engines": { "node": ">=22.12.0" },
   "scripts": { "dev": "tsx watch server/index.ts", "start": "node build/server/index.js", "build": "tsc --noEmit && vite build && vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && tsc -p tsconfig.server.json", "check": "tsc --noEmit", "test": "tsx --test tests/*.test.ts", "test:maps": "tsx scripts/check-maps.ts", "test:load": "tsx scripts/load-test.ts" },
   "dependencies": { "ws": "^8.18.0", "qrcode": "^1.5.4" },
