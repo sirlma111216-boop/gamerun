@@ -1,0 +1,18 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {Room} from '../server/room.js';
+import {DEFAULT_RULES,validateRules,NO_INPUT} from '../shared/types.js';
+import {makePlayer,damage,stepPlayer} from '../shared/physics.js';
+import {createMap} from '../shared/maps.js';
+import {finalize} from '../shared/results.js';
+const meta={matchId:'v2',activityId:'test',map:1,endReason:'normal' as const};
+const room=(mode:'race'|'last'='race',count=1)=>{const r=new Room('123456','test',1,{mode,count});r.join('하나','a');r.join('두리','b');r.join('세미','c');r.start();for(let i=0;i<180;i++)r.advance();return r;};
+test('시작 버튼은 준비 체크 없이 참가자 전체를 출발시킴 / 30명 상한',()=>{const r=room();assert.equal(r.phase,'running');const full=new Room('654321');for(let i=0;i<30;i++)full.join('테스트',String(i));assert.throws(()=>full.join('초과','31'),/30명/);});
+test('코스 시간 뒤에도 자동 종료 없음 / 교사는 강제 종료 가능',()=>{const r=room();for(let i=0;i<6000;i++)r.advance();assert.equal(r.phase,'running');r.end('teacher');assert.equal(r.result?.endReason,'teacher');assert.deepEqual(r.result?.selectedIds,[]);});
+test('도착 보상은 N명 완주 후 종료, 같은 틱의 경계 동점 공동 선정',()=>{const r=room('race',2);const a=r.players.get('a')!,b=r.players.get('b')!,c=r.players.get('c')!;a.finishTick=10;a.status='finished';r.advance();assert.equal(r.phase,'running');b.finishTick=c.finishTick=20;b.status=c.status='finished';r.advance();assert.equal(r.phase,'results');assert.deepEqual(r.result?.selectedIds,['a','b','c']);});
+test('꼴찌는 첫 완주 시점의 현재 위치를 사용, 과거 최대 거리와 구별',()=>{const r=room('last');const a=r.players.get('a')!,b=r.players.get('b')!,c=r.players.get('c')!;a.status='finished';a.finishTick=100;b.x=120;b.progress=900;c.x=400;c.progress=400;r.advance();assert.equal(r.phase,'results');assert.deepEqual(r.result?.selectedIds,['b']);});
+test('꼴찌는 N번째 탈락 틱에 즉시 종료, 같은 틱 탈락자 공동 선정',()=>{const r=room('last',2);const a=r.players.get('a')!,b=r.players.get('b')!,c=r.players.get('c')!;a.status='eliminated';a.eliminationTick=10;r.advance();assert.equal(r.phase,'running');b.status=c.status='eliminated';b.eliminationTick=c.eliminationTick=20;r.advance();assert.deepEqual(r.result?.selectedIds,['a','b','c']);});
+test('목숨 무한/1/3/5를 양 모드에 적용, 연습은 항상 재도전',()=>{for(const mode of ['race','last'] as const)for(const lives of [0,1,3,5] as const){const p=makePlayer('p','닉네임',lives),m=createMap();const rules={...DEFAULT_RULES,mode,lives};for(let i=0;i<(lives||8);i++){p.respawn=0;damage(p,m,rules,i);}assert.equal(p.status,lives===0?'active':'eliminated');}const p=makePlayer('p','연습',1);p.y=800;stepPlayer(p,NO_INPUT,createMap(),{...DEFAULT_RULES,lives:1},1,true);assert.equal(p.status,'active');assert.ok(p.respawn>0);});
+test('고정 규칙 강제 및 제거한 모드/값 거부',()=>{assert.throws(()=>validateRules({mode:'survival'}));assert.throws(()=>validateRules({lives:2}));assert.equal(validateRules({duration:30}).duration,30);assert.ok(!('ties' in validateRules({ties:'random',selection:'rank'})));});
+test('탈락자와 현재 위치 동점 / 연결 중단과 봇 제외',()=>{const a=makePlayer('a','a'),b=makePlayer('b','b'),c=makePlayer('c','c');a.x=b.x=120;c.x=100;c.connected=false;assert.deepEqual(finalize([a,b,c],{...DEFAULT_RULES,mode:'last'},meta).selectedIds,['a','b']);});
+test('상급 맵: 공중 2단, 반대 위상 승강석, 가로 위험막대, 절벽 직전 급가속',()=>{const sky=createMap(2),sand=createMap(3),cave=createMap(4),factory=createMap(5);assert.ok(sky.platforms.filter(p=>p.move?.axis==='x'&&p.y<400).length>=2);const lifts=sand.platforms.filter(p=>p.move?.axis==='y');assert.equal(lifts[1].move!.phase-lifts[0].move!.phase,Math.PI);assert.ok(cave.hazards.some(h=>h.w>h.h));const belt=factory.platforms.find(p=>(p.belt||0)>=200)!;assert.ok(!factory.platforms.some(p=>p.id!==belt.id&&p.x<=belt.x+belt.w+50&&p.x+p.w>belt.x+belt.w));});

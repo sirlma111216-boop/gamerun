@@ -1,0 +1,16 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {Room} from '../server/room.js';
+import {createMap,MAP_INFO} from '../shared/maps.js';
+import {makePlayer,stepPlayer,damage,DT,platformAt} from '../shared/physics.js';
+import {finalize} from '../shared/results.js';
+import {DEFAULT_RULES,NO_INPUT,validateRules} from '../shared/types.js';
+const meta={matchId:'test',activityId:'lesson',map:1,endReason:'timeout' as const};
+function readyRoom(mode='race'){const r=new Room('123456','lesson',1,{...DEFAULT_RULES,mode});r.join('하나','a').player.ready=true;r.join('두리','b').player.ready=true;return r;}
+test('봇과 관전자는 사람 선정에서 제외',()=>{const a=makePlayer('a','테스트',1,true),b=makePlayer('b','관전');b.status='spectator';assert.deepEqual(finalize([a,b],DEFAULT_RULES,meta,()=>0).selectedIds,[]);});
+test('시작 중복 방지 / 3초 카운트다운은 경기 시간에서 제외 / 설정 잠금',()=>{const r=readyRoom();r.start();assert.throws(()=>r.start());assert.throws(()=>r.settings(2,DEFAULT_RULES));for(let i=0;i<180;i++)r.advance();assert.equal(r.phase,'running');assert.equal(r.tick,0);r.advance();assert.equal(r.tick,1);});
+test('종료 결과 고정 / 재접속으로 목숨 회복 없음 / 재경기 초기화',()=>{const r=readyRoom();r.start();for(let i=0;i<190;i++)r.advance();const a=r.players.get('a')!;a.lives=0;a.status='eliminated';a.connected=false;const token=r.tokens.get('a')!;assert.throws(()=>r.join('공격','a','wrong'));r.join('하나','a',token);assert.equal(a.lives,0);assert.equal(a.status,'eliminated');r.end('teacher');const result=r.result;assert.ok(result);r.end('timeout');assert.equal(r.result,result);const id=r.matchId;r.restart();assert.notEqual(r.matchId,id);assert.equal(r.players.get('a')!.lives,0);assert.equal(r.players.get('a')!.ready,false);assert.equal(r.result,null);});
+test('경기 시작 이후 신규 참가자는 관전',()=>{const r=readyRoom();r.start();assert.equal(r.join('늦게','late').player.status,'spectator');});
+test('공유 물리의 결정적 실행 / 점프 버퍼 / 코요테 타임',()=>{const m=createMap(1),a=makePlayer('a','a'),b=makePlayer('a','a');for(let t=1;t<300;t++){const input={left:false,right:true,jump:t===215};stepPlayer(a,input,m,DEFAULT_RULES,t);stepPlayer(b,input,m,DEFAULT_RULES,t);}assert.deepEqual(a,b);const p=makePlayer('p','p');p.ground=null;p.coyote=.08;stepPlayer(p,{...NO_INPUT,jump:true},m,DEFAULT_RULES,1);assert.ok(p.vy<0);const q=makePlayer('q','q');q.y=425;q.vy=200;q.ground=null;q.coyote=0;stepPlayer(q,{...NO_INPUT,jump:true},m,DEFAULT_RULES,1);for(let t=2;t<=5;t++)stepPlayer(q,NO_INPUT,m,DEFAULT_RULES,t);assert.ok(q.vy<0);});
+test('이동 발판에 서 있으면 발판의 이동량만큼 운반',()=>{const m=createMap(3),base=m.platforms.find(p=>p.move)!;const before=platformAt(base,0),p=makePlayer('p','p');p.x=before.x+50;p.y=before.y;p.ground=base.id;stepPlayer(p,NO_INPUT,m,DEFAULT_RULES,1);assert.ok(Math.abs(p.x-(platformAt(base,DT).x+50))<.001);assert.equal(p.ground,base.id);});
+test('모든 맵에 독립 지형 및 안전 체크포인트 / 입력 검증',()=>{assert.equal(MAP_INFO.length,5);const signatures=new Set(MAP_INFO.map(i=>JSON.stringify(createMap(i.id).platforms)));assert.equal(signatures.size,5);for(const i of MAP_INFO){const m=createMap(i.id);for(const cp of m.checkpoints){assert.ok(m.platforms.some(p=>!p.move&&cp.x>p.x+30&&cp.x<p.x+p.w-30&&cp.y===p.y));assert.ok(!m.hazards.some(h=>Math.abs(h.x-cp.x)<70));}}assert.throws(()=>validateRules({duration:10}));assert.throws(()=>validateRules({mode:'survival',early:true}));});

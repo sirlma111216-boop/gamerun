@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","compilerOptions":{"declaration":true,"emitDeclarationOnly":true,"noEmit":false,"allowImportingTsExtensions":true,"outDir":"dist/module/types","rootDir":"."},"include":["src/game","shared"]}
